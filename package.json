@@ -1,14 +1,69 @@
 {
-  "name": "one-click-rewrite",
-  "private": true,
-  "version": "0.1.0",
+  "name": "ai-one-click-rewrite",
+  "version": "1.0.0",
+  "description": "AI-powered text rewriting Chrome extension with React + TypeScript",
+  "author": "Yossi Gruner <yossigruner@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yossigruner/ai-one-click-rewrite.git"
+  },
+  "homepage": "https://github.com/yossigruner/ai-one-click-rewrite",
+  "bugs": {
+    "url": "https://github.com/yossigruner/ai-one-click-rewrite/issues"
+  },
   "type": "module",
   "scripts": {
-    "dev": "echo 'Load as unpacked in chrome://extensions' && exit 0",
-    "zip": "bash scripts/zip.sh"
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint . --ext ts,tsx,js,jsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx,js,jsx --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:lint": "npm run format && npm run lint:fix",
+    "icons": "node scripts/generate-icons.js",
+    "prepare": "husky install"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.11.1",
+    "@emotion/styled": "^11.11.0",
+    "@mui/icons-material": "^5.15.1",
+    "@mui/material": "^5.15.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "webext-bridge": "^6.0.1"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --write",
+      "eslint --fix"
+    ],
+    "*.{json,css,md}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
-    "eslint": "^9.6.0",
-    "prettier": "^3.3.3"
+    "@types/chrome": "^0.0.253",
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "eslint": "^8.55.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5",
+    "postcss": "^8.4.32",
+    "prettier": "^3.6.2",
+    "sharp": "^0.34.3",
+    "tailwindcss": "^3.3.6",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8",
+    "vite-plugin-static-copy": "^1.0.0"
   }
 }

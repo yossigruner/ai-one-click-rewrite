@@ -1,0 +1,14 @@
+{
+  "name": "one-click-rewrite",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "echo 'Load as unpacked in chrome://extensions' && exit 0",
+    "zip": "bash scripts/zip.sh"
+  },
+  "devDependencies": {
+    "eslint": "^9.6.0",
+    "prettier": "^3.3.3"
+  }
+}

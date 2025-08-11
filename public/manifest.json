@@ -1,0 +1,49 @@
+{
+  "manifest_version": 3,
+  "name": "AI One‑Click Rewrite",
+  "version": "2.0.0",
+  "description": "Instantly rewrite selected text using AI providers (OpenAI, Anthropic, Google Gemini)",
+  "author": "Yossi Gruner",
+  "homepage_url": "https://github.com/yossigruner/ai-one-click-rewrite",
+
+  "permissions": [
+    "contextMenus",
+    "activeTab",
+    "scripting",
+    "storage",
+    "notifications"
+  ],
+
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+
+  "options_page": "options.html",
+
+  "action": {
+    "default_title": "AI One‑Click Rewrite Settings"
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/*", "chunks/*"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}

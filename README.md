@@ -7,8 +7,8 @@ providers (OpenAI, Anthropic, Google Gemini) built with **React**,
 ## ✨ Features
 
 - **🤖 Multiple AI Providers**: OpenAI GPT, Anthropic Claude, Google Gemini
-- **⚡ Instant Rewriting**: Select text, right-click, and rewrite with AI
-- **🎯 Smart Presets**: 10+ built-in writing styles plus custom instructions
+- **⚡ Two Rewrite Modes**: Auto-Replace (instant) or Preview Mode (controlled)
+- **🎯 Smart Presets**: Professional, friendly, and custom writing styles
 - **🎨 Modern UI**: Beautiful React interface with Material Design
 - **🔒 Secure**: API keys stored locally, never sent to our servers
 - **🛠️ Developer-Friendly**: TypeScript, modern build system, hot reload
@@ -107,33 +107,43 @@ npm run icons        # Generate PNG icons from SVG
 
 ## 📖 Usage
 
+### Two Rewrite Modes
+
+#### Auto-Replace Mode (Default)
+- Select text and click the floating ✨ button
+- Text is instantly replaced with AI suggestions
+- Perfect for quick, confident rewrites
+
+#### Preview Mode
+- Select text and right-click → "Rewrite with AI"
+- Opens a side panel with style selection and preview
+- Review AI suggestions before applying
+- Choose from professional, friendly, or custom styles
+
 ### Method 1: Context Menu
 
 1. Select any text on a webpage
 2. Right-click and choose "Rewrite with AI"
-3. The text will be instantly replaced
+3. In Auto-Replace mode: text is instantly replaced
+4. In Preview mode: side panel opens for controlled rewriting
 
 ### Method 2: Floating Button
 
 1. Select text on any webpage
 2. Click the floating ✨ button that appears
-3. Watch your text transform instantly
+3. In Auto-Replace mode: watch your text transform instantly
+4. In Preview mode: side panel opens for controlled rewriting
 
-## 🎯 Writing Presets
+## 🎯 Writing Styles
 
 Choose from professional presets or create custom instructions:
 
-- **Professional concise** - Clear, business-appropriate tone
-- **Friendly & clear** - Approachable and easy to understand
-- **Polish grammar only** - Fix errors without changing style
-- **Shorten to 1–2 sentences** - Condense to key points
-- **Make it more assertive** - Strengthen confidence and authority
-- **Make it more casual** - Relaxed, conversational tone
-- **Fix typos, keep tone** - Correct errors, preserve voice
-- **Summarize as bullet points** - Convert to organized list format
-- **Rewrite for Slack** - Short, punchy workplace communication
-- **Rewrite for email** - Professional email formatting
-- **Custom** - Write your own rewriting instructions
+- **✨ Professional & Concise** - Clear, business-appropriate tone
+- **😊 Friendly & Clear** - Approachable and easy to understand
+- **📝 Polish Grammar Only** - Fix errors without changing style
+- **⚡ Shorten to 1-2 Sentences** - Condense to key points
+- **💪 Make it More Assertive** - Strengthen confidence and authority
+- **🎨 Custom Instructions** - Write your own rewriting instructions
 
 ## 🛠️ Development
 
@@ -143,7 +153,7 @@ Choose from professional presets or create custom instructions:
 - **Styling**: TailwindCSS + Material UI
 - **Build Tool**: Vite
 - **Code Quality**: ESLint + Prettier + Husky
-- **Messaging**: Webext-bridge (type-safe cross-context communication)
+- **Messaging**: Standard Chrome Extension messaging
 - **Architecture**: Chrome Extension Manifest V3
 
 ### Project Structure
@@ -156,7 +166,7 @@ src/
 ├── components/        # Reusable React components
 ├── providers/         # AI provider implementations (modular)
 ├── types/            # TypeScript type definitions
-└── utils/            # Utility functions (storage, webext-bridge)
+└── utils/            # Utility functions (storage, messaging)
 
 public/
 ├── manifest.json     # Extension manifest
@@ -291,10 +301,10 @@ src/
 │   ├── gemini.ts             # Google Gemini provider
 │   └── index.ts              # Provider registry and factory
 ├── types/
-│   └── index.ts              # TypeScript type definitions + webext-bridge protocol
+│   └── index.ts              # TypeScript type definitions
 └── utils/
     ├── storage.ts            # Chrome storage utilities
-    └── bridge.ts             # Webext-bridge setup and utilities
+    └── bridge.ts             # Messaging utilities
 
 public/
 ├── manifest.json             # Extension manifest
@@ -309,51 +319,6 @@ public/
 - **TypeScript**: Full type checking during build
 - **Hot Reload**: React components update instantly during development
 - **Modular Providers**: Clean separation of AI provider logic
-
-#### 🌉 Webext-bridge Integration
-
-This project uses **webext-bridge** for type-safe messaging between extension
-contexts:
-
-**Benefits:**
-
-- 🔒 **Type-safe messaging** - No more runtime errors from wrong message formats
-- 📡 **Cross-context communication** - Background ↔ Content ↔ Options
-  seamlessly
-- 🎯 **Auto-completion** - Full TypeScript intellisense for all message types
-- 🔧 **Better debugging** - Clear message protocols and error handling
-
-**Usage Example:**
-
-```typescript
-// Background script
-import { onMessage, sendMessage } from 'webext-bridge/background'
-
-onMessage('trigger-rewrite', async ({ sender, data }) => {
-  const { selection } = data
-  // Process rewrite...
-  await sendMessage(
-    'replace-selection',
-    {
-      tabId: sender.tabId!,
-      rewrittenText: result,
-    },
-    { context: 'content-script', tabId: sender.tabId! }
-  )
-})
-
-// Content script
-import { sendMessage } from 'webext-bridge/content-script'
-
-await sendMessage(
-  'trigger-rewrite',
-  {
-    selection: selectedText,
-    tabId: getCurrentTabId(),
-  },
-  'background'
-)
-```
 
 #### 🔌 Modular Provider System
 

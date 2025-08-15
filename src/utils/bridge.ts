@@ -1,48 +1,37 @@
 /**
- * Webext-bridge utilities and setup
- * This file provides type-safe messaging between extension contexts
+ * Chrome messaging utilities
+ * This file provides utilities for standard Chrome extension messaging
  */
 
-import { allowWindowMessaging } from 'webext-bridge/content-script'
-
-// Enable window messaging for better cross-context communication
-// This allows content scripts to communicate with injected scripts if needed
-export const setupBridge = () => {
-  try {
-    allowWindowMessaging('ai-one-click-rewrite')
-  } catch (error) {
-    console.warn('Failed to setup window messaging:', error)
-  }
-}
-
-// Type-safe message sending utilities
+// Note: This extension uses standard Chrome messaging instead of webext-bridge
+// for better compatibility and simpler debugging
 
 /**
- * Common patterns for webext-bridge usage:
+ * Common patterns for Chrome messaging:
  *
  * Background script:
  * ```ts
- * import { onMessage, sendMessage } from 'webext-bridge/background'
- *
  * // Listen for messages
- * onMessage('trigger-rewrite', async ({ sender, data }) => {
- *   // Handle message
+ * chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+ *   if (message.type === 'trigger-rewrite') {
+ *     // Handle message
+ *   }
  * })
  *
  * // Send message to content script
- * await sendMessage('show-loading', { tabId }, { context: 'content-script', tabId })
+ * chrome.tabs.sendMessage(tabId, { type: 'show-loading' })
  * ```
  *
  * Content script:
  * ```ts
- * import { onMessage, sendMessage } from 'webext-bridge/content-script'
- *
  * // Listen for messages
- * onMessage('show-loading', ({ data }) => {
- *   // Handle message
+ * chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+ *   if (message.type === 'show-loading') {
+ *     // Handle message
+ *   }
  * })
  *
  * // Send message to background
- * await sendMessage('trigger-rewrite', { selection }, 'background')
+ * chrome.runtime.sendMessage({ type: 'trigger-rewrite', selection: text })
  * ```
  */

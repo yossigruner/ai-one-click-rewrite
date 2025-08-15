@@ -2,14 +2,13 @@ import React from 'react'
 import {
   Box,
   Typography,
-  Card,
-  CardContent,
   FormControlLabel,
   Radio,
   RadioGroup,
   Chip,
+  Alert,
 } from '@mui/material'
-import { Bolt as ModeIcon, FlashOn as AutoIcon } from '@mui/icons-material'
+import { Bolt as ModeIcon, FlashOn as AutoIcon, Visibility as PreviewIcon } from '@mui/icons-material'
 import { ExtensionSettings } from '@/types'
 
 interface ModeSectionProps {
@@ -23,8 +22,8 @@ const ModeSection: React.FC<ModeSectionProps> = ({ settings, onSettingsChange })
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+    <Box sx={{ p: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
         <Box
           sx={{
             width: 48,
@@ -33,10 +32,11 @@ const ModeSection: React.FC<ModeSectionProps> = ({ settings, onSettingsChange })
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #f97316 0%, #ea580c 100%)',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e9ecef',
           }}
         >
-          <ModeIcon sx={{ color: 'white', fontSize: 24 }} />
+          <ModeIcon sx={{ color: '#666', fontSize: 24 }} />
         </Box>
         <Typography variant="h4">Rewrite Mode</Typography>
       </Box>
@@ -45,44 +45,51 @@ const ModeSection: React.FC<ModeSectionProps> = ({ settings, onSettingsChange })
         Choose how the extension transforms your text
       </Typography>
 
-      <RadioGroup value={settings.mode} onChange={handleModeChange} sx={{ gap: 2 }}>
+      {/* Mode Change Alert */}
+      {settings.mode === 'preview' && (
+        <Alert severity="info" sx={{ mb: 4, borderRadius: 2 }}>
+          <Typography variant="body2">
+            <strong>Preview Mode Active:</strong> Select text to open a side panel where you can choose writing styles and preview results before applying changes.
+          </Typography>
+        </Alert>
+      )}
+
+      <RadioGroup value={settings.mode} onChange={handleModeChange} sx={{ gap: 3 }}>
         {/* Auto-Replace Mode */}
-        <Card
+        <Box
           sx={{
-            border:
-              settings.mode === 'auto-replace' ? '2px solid #f97316' : '2px solid transparent',
-            background:
-              settings.mode === 'auto-replace'
-                ? 'linear-gradient(135deg, #fff7ed 0%, #fed7aa 100%)'
-                : 'rgba(255, 255, 255, 0.8)',
+            border: settings.mode === 'auto-replace' ? '2px solid #f97316' : '1px solid #e0e0e0',
+            backgroundColor: settings.mode === 'auto-replace' ? '#fff7ed' : '#fff',
+            borderRadius: 2,
+            p: 3,
             cursor: 'pointer',
             transition: 'all 0.2s ease',
             '&:hover': {
-              transform: 'translateY(-2px)',
-              boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+              borderColor: '#f97316',
+              backgroundColor: '#fff7ed',
             },
           }}
         >
-          <CardContent sx={{ p: 3 }}>
-            <FormControlLabel
-              value="auto-replace"
-              control={
-                <Radio
-                  sx={{
+          <FormControlLabel
+            value="auto-replace"
+            control={
+              <Radio
+                sx={{
+                  color: '#f97316',
+                  '&.Mui-checked': {
                     color: '#f97316',
-                    '&.Mui-checked': {
-                      color: '#f97316',
-                    },
-                  }}
-                />
-              }
-              label={
-                <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <AutoIcon sx={{ color: '#f97316', fontSize: 20 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 600 }}>
-                      Auto-Replace Mode
-                    </Typography>
+                  },
+                }}
+              />
+            }
+            label={
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <AutoIcon sx={{ color: '#f97316', fontSize: 20 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Auto-Replace Mode
+                  </Typography>
+                  {settings.mode === 'auto-replace' && (
                     <Chip
                       label="Active"
                       size="small"
@@ -93,67 +100,88 @@ const ModeSection: React.FC<ModeSectionProps> = ({ settings, onSettingsChange })
                         fontWeight: 600,
                       }}
                     />
-                  </Box>
-                  <Typography variant="body2" color="text.secondary">
-                    Directly replaces selected text without preview (instant and seamless)
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Directly replaces selected text without preview (instant and seamless)
+                </Typography>
+                <Box sx={{ p: 2, backgroundColor: '#fef3c7', borderRadius: 1 }}>
+                  <Typography variant="caption" sx={{ color: '#d97706', fontWeight: 600 }}>
+                    How it works:
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#ea580c', mt: 1, display: 'block' }}>
-                    ✨ Streamlined experience with immediate results
+                  <Typography variant="caption" sx={{ color: '#d97706', display: 'block', mt: 0.5 }}>
+                    1. Select text → 2. Click floating button → 3. Text is instantly rewritten
                   </Typography>
                 </Box>
-              }
-              sx={{ margin: 0, alignItems: 'flex-start' }}
-            />
-          </CardContent>
-        </Card>
+              </Box>
+            }
+            sx={{ margin: 0, alignItems: 'flex-start' }}
+          />
+        </Box>
 
-        {/* Preview Mode - Disabled */}
-        <Card
+        {/* Preview Mode */}
+        <Box
           sx={{
-            border: '2px solid #e5e7eb',
-            background: '#f9fafb',
-            opacity: 0.6,
-            position: 'relative',
+            border: settings.mode === 'preview' ? '2px solid #3b82f6' : '1px solid #e0e0e0',
+            backgroundColor: settings.mode === 'preview' ? '#eff6ff' : '#fff',
+            borderRadius: 2,
+            p: 3,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              borderColor: '#3b82f6',
+              backgroundColor: '#eff6ff',
+            },
           }}
         >
-          <CardContent sx={{ p: 3 }}>
-            <FormControlLabel
-              value="preview"
-              control={
-                <Radio
-                  disabled
-                  sx={{
-                    color: '#9ca3af',
-                  }}
-                />
-              }
-              label={
-                <Box>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="h6" sx={{ fontWeight: 600, color: '#6b7280' }}>
-                      Preview Mode
-                    </Typography>
+          <FormControlLabel
+            value="preview"
+            control={
+              <Radio
+                sx={{
+                  color: '#3b82f6',
+                  '&.Mui-checked': {
+                    color: '#3b82f6',
+                  },
+                }}
+              />
+            }
+            label={
+              <Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  <PreviewIcon sx={{ color: '#3b82f6', fontSize: 20 }} />
+                  <Typography variant="h6" sx={{ fontWeight: 600 }}>
+                    Preview Mode
+                  </Typography>
+                  {settings.mode === 'preview' && (
                     <Chip
-                      label="Coming Soon"
+                      label="Active"
                       size="small"
                       sx={{
-                        backgroundColor: '#e5e7eb',
-                        color: '#6b7280',
+                        backgroundColor: '#dbeafe',
+                        color: '#1d4ed8',
                         fontSize: '0.75rem',
                         fontWeight: 600,
                       }}
                     />
-                  </Box>
-                  <Typography variant="body2" sx={{ color: '#6b7280' }}>
-                    Show results in a side panel before applying changes
+                  )}
+                </Box>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Show results in a side panel before applying changes
+                </Typography>
+                <Box sx={{ p: 2, backgroundColor: '#eff6ff', borderRadius: 1 }}>
+                  <Typography variant="caption" sx={{ color: '#1d4ed8', fontWeight: 600 }}>
+                    How it works:
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: '#1d4ed8', display: 'block', mt: 0.5 }}>
+                    1. Select text → 2. Side panel opens → 3. Choose style → 4. Preview → 5. Apply
                   </Typography>
                 </Box>
-              }
-              sx={{ margin: 0, alignItems: 'flex-start' }}
-              disabled
-            />
-          </CardContent>
-        </Card>
+              </Box>
+            }
+            sx={{ margin: 0, alignItems: 'flex-start' }}
+          />
+        </Box>
       </RadioGroup>
     </Box>
   )

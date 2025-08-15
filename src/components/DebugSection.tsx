@@ -31,8 +31,8 @@ const DebugSection: React.FC<DebugSectionProps> = ({ settings, onSettingsChange 
   }
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+    <Box sx={{ p: 4 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
         <Box
           sx={{
             width: 48,
@@ -41,15 +41,16 @@ const DebugSection: React.FC<DebugSectionProps> = ({ settings, onSettingsChange 
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #6b7280 0%, #374151 100%)',
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e9ecef',
           }}
         >
-          <DebugIcon sx={{ color: 'white', fontSize: 24 }} />
+          <DebugIcon sx={{ color: '#666', fontSize: 24 }} />
         </Box>
-        <Typography variant="h5">Debug Settings</Typography>
+        <Typography variant="h4">Debug Settings</Typography>
       </Box>
 
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
         Developer tools and troubleshooting options
       </Typography>
 
@@ -59,17 +60,17 @@ const DebugSection: React.FC<DebugSectionProps> = ({ settings, onSettingsChange 
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          p: 2,
-          border: '2px solid',
-          borderColor: settings.debugLogs ? 'primary.main' : 'grey.300',
+          p: 3,
+          border: '1px solid',
+          borderColor: settings.debugLogs ? '#3b82f6' : '#e0e0e0',
           borderRadius: 2,
-          backgroundColor: settings.debugLogs ? 'primary.50' : 'grey.50',
-          mb: 3,
+          backgroundColor: settings.debugLogs ? '#eff6ff' : '#f8f9fa',
+          mb: 4,
           transition: 'all 0.2s ease',
         }}
       >
         <Box>
-          <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 1 }}>
             Enable debug logs
           </Typography>
           <Typography variant="body2" color="text.secondary">
@@ -90,7 +91,7 @@ const DebugSection: React.FC<DebugSectionProps> = ({ settings, onSettingsChange 
         <Alert
           severity="success"
           sx={{
-            mb: 3,
+            mb: 4,
             borderRadius: 2,
             '& .MuiAlert-icon': {
               fontSize: 20,
@@ -112,9 +113,8 @@ const DebugSection: React.FC<DebugSectionProps> = ({ settings, onSettingsChange 
         severity="info"
         sx={{
           borderRadius: 2,
-          backgroundColor: 'grey.50',
-          border: '1px solid',
-          borderColor: 'grey.200',
+          backgroundColor: '#f8f9fa',
+          border: '1px solid #e9ecef',
         }}
       >
         <Typography

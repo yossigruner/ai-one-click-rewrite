@@ -3,7 +3,7 @@ import { DEFAULT_SETTINGS, ExtensionSettings } from '@/types'
 // import { onMessage, sendMessage } from 'webext-bridge/background'
 
 // Logging utility
-let isDebugEnabled = true
+let isDebugEnabled = false
 
 const log = (...args: any[]) => {
   if (isDebugEnabled) {
@@ -28,7 +28,258 @@ const updateDebugLogging = async () => {
   }
 }
 
+// Ensure content script is ready
+const ensureContentScriptReady = async (tabId: number): Promise<boolean> => {
+  try {
+    // Try to send a ping message to check if content script is ready
+    await chrome.tabs.sendMessage(tabId, { type: 'ping' })
+    return true
+  } catch (error: any) {
+    if (error.message?.includes('Receiving end does not exist')) {
+      // Content script not ready, inject it
+      log('Content script not ready, injecting...')
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId },
+          files: ['content.js']
+        })
+        
+        // Wait for content script to initialize
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        // Try ping again
+        try {
+          await chrome.tabs.sendMessage(tabId, { type: 'ping' })
+          log('Content script ready after injection')
+          return true
+        } catch (pingError: any) {
+          log('Content script still not ready after injection')
+          return false
+        }
+      } catch (injectionError: any) {
+        // Check if this is a restricted page
+        if (injectionError.message?.includes('cannot be scripted') || 
+            injectionError.message?.includes('restricted') ||
+            injectionError.message?.includes('chrome://') ||
+            injectionError.message?.includes('chrome-extension://') ||
+            injectionError.message?.includes('moz-extension://')) {
+          log('Page is restricted - cannot inject content script')
+          return false
+        }
+        log('Failed to inject content script:', injectionError.message)
+        return false
+      }
+    }
+    return false
+  }
+}
+
+// Check if page is restricted
+const isPageRestricted = async (tabId: number): Promise<boolean> => {
+  try {
+    const tab = await chrome.tabs.get(tabId)
+    const url = tab.url || ''
+    
+    // Check for restricted URLs
+    const restrictedPatterns = [
+      'chrome://',
+      'chrome-extension://',
+      'moz-extension://',
+      'edge://',
+      'about:',
+      'chrome-search://',
+      'chrome-devtools://',
+      'view-source:',
+      'data:',
+      'file://'
+    ]
+    
+    return restrictedPatterns.some(pattern => url.startsWith(pattern))
+  } catch (error) {
+    log('Failed to check if page is restricted:', error)
+    return false
+  }
+}
+
+// Create user-friendly error messages
+const createUserFriendlyError = (error: string, provider: string): string => {
+  // Handle rate limit/quota exceeded errors
+  if (error.includes('429') || error.includes('quota') || error.includes('rate limit')) {
+    return `Too many requests! Your ${provider} account has reached its limit. Please try again later or check your billing settings.`
+  }
+  
+  // Handle authentication errors
+  if (error.includes('401') || error.includes('unauthorized') || error.includes('invalid api key')) {
+    return `Authentication failed! Please check your ${provider} API key in the extension settings.`
+  }
+  
+  // Handle network errors
+  if (error.includes('network') || error.includes('connection') || error.includes('timeout')) {
+    return `Connection error! Please check your internet connection and try again.`
+  }
+  
+  // Handle model-specific errors
+  if (error.includes('model') || error.includes('not found')) {
+    return `Model not available! The selected ${provider} model may be temporarily unavailable. Please try a different model.`
+  }
+  
+  // Handle billing errors
+  if (error.includes('billing') || error.includes('payment') || error.includes('credit')) {
+    return `Billing issue! Please check your ${provider} account billing status and add payment method if needed.`
+  }
+  
+  // Default error message
+  return `Something went wrong with ${provider}. Please try again or check your settings.`
+}
+
 // Provider system using the new modular providers
+
+// Preview rewrite handler
+const handlePreviewRewrite = async (selection: string, tabId: number, style: string, customInstructions?: string) => {
+  const startTime = Date.now()
+  const timestamp = new Date().toISOString()
+
+  log('Preview rewrite process starting', {
+    tabId,
+    selectionLength: selection.length,
+    style,
+    timestamp,
+    processId: `${tabId}-${startTime}`,
+  })
+
+  try {
+    // Validate selection
+    if (!selection || selection.trim().length === 0) {
+      throw new Error('No text selected')
+    }
+
+    // Load settings with timing
+    const configStartTime = Date.now()
+    const cfg = (await chrome.storage.sync.get(DEFAULT_SETTINGS)) as ExtensionSettings
+    const configLoadTime = Date.now() - configStartTime
+
+    const provider = cfg.provider || 'openai'
+    const apiKey = cfg.keys[provider]
+    const model = cfg.models[provider]
+
+    log('Configuration loaded for preview', {
+      provider,
+      model,
+      style,
+      configLoadTimeMs: configLoadTime,
+      hasApiKey: !!apiKey,
+    })
+
+    if (!apiKey) {
+      // Send error message to content script
+      await chrome.tabs.sendMessage(tabId, {
+        type: 'update-preview-result',
+        error: `No API key configured for ${provider}. Please configure your API key in the extension options.`,
+      })
+      return
+    }
+
+    // Use provided style or custom instructions
+    const instructions = style === 'Custom' && customInstructions 
+      ? customInstructions 
+      : style
+
+    log('Using configuration for preview', {
+      provider,
+      model,
+      style: style === 'Custom' ? 'Custom' : style,
+      instructionsLength: instructions.length,
+    })
+
+    // Get AI provider instance
+    const providerInstance = getProvider(provider)
+    log('AI provider instance obtained for preview', { providerName: providerInstance.name })
+
+    const request: RewriteRequest = {
+      text: selection,
+      instructions,
+      config: {
+        apiKey,
+        model,
+        temperature: 0.7,
+        maxTokens: 2000,
+      },
+    }
+
+    // Track AI provider call timing
+    const aiCallStartTime = Date.now()
+    const result = await providerInstance.rewrite(request)
+    const aiCallDuration = Date.now() - aiCallStartTime
+
+    if (!result.success || !result.rewrittenText) {
+      logError('AI provider call failed for preview', {
+        provider,
+        model,
+        error: result.error,
+        aiCallDurationMs: aiCallDuration,
+        totalDurationMs: Date.now() - startTime,
+      })
+      
+      // Create user-friendly error message
+      const userFriendlyError = createUserFriendlyError(result.error || 'Failed to get rewritten text', provider)
+      
+      await chrome.tabs.sendMessage(tabId, {
+        type: 'update-preview-result',
+        error: userFriendlyError,
+      })
+      return
+    }
+
+    // Log successful AI response
+    log('AI provider response received for preview', {
+      provider,
+      model,
+      success: true,
+      aiCallDurationMs: aiCallDuration,
+      originalText: {
+        length: selection.length,
+        preview: selection.substring(0, 50) + (selection.length > 50 ? '...' : ''),
+      },
+      rewrittenText: {
+        length: result.rewrittenText.length,
+        preview: result.rewrittenText.substring(0, 50) + (result.rewrittenText.length > 50 ? '...' : ''),
+      },
+    })
+
+    // Send result to content script
+    await chrome.tabs.sendMessage(tabId, {
+      type: 'update-preview-result',
+      rewrittenText: result.rewrittenText,
+      style: style,
+    })
+
+    log('Preview rewrite completed successfully', {
+      provider,
+      originalLength: selection.length,
+      rewrittenLength: result.rewrittenText.length,
+      aiCallDurationMs: aiCallDuration,
+      totalDurationMs: Date.now() - startTime,
+    })
+
+  } catch (error: any) {
+    logError('Preview rewrite process failed', {
+      error: error.message,
+      tabId,
+      selectionLength: selection.length,
+      totalDurationMs: Date.now() - startTime,
+    })
+
+    // Send error to content script
+    try {
+      await chrome.tabs.sendMessage(tabId, {
+        type: 'update-preview-result',
+        error: error.message || 'An unexpected error occurred',
+      })
+    } catch (sendError: any) {
+      logError('Failed to send error message to content script', { error: sendError.message })
+    }
+  }
+}
 
 // Main rewrite handler
 const handleRewrite = async (selection: string, tabId: number) => {
@@ -197,6 +448,21 @@ const handleRewrite = async (selection: string, tabId: number) => {
         totalDurationMs: Date.now() - startTime,
         requestSize: selection.length,
       })
+      
+      // Create user-friendly error message
+      const userFriendlyError = createUserFriendlyError(result.error || 'Failed to get rewritten text', provider)
+      
+      // Send error to content script
+      try {
+        await chrome.tabs.sendMessage(tabId, {
+          type: 'show-error',
+          error: userFriendlyError,
+          provider,
+        })
+      } catch (error: any) {
+        log('Failed to send error message to content script', { error: error.message })
+      }
+      
       throw new Error(result.error || 'Failed to get rewritten text')
     }
 
@@ -434,21 +700,7 @@ const handleRewrite = async (selection: string, tabId: number) => {
       }
     }
 
-    // Clean up immediate loading overlay
-    try {
-      chrome.scripting.executeScript({
-        target: { tabId },
-        func: () => {
-          const immediateOverlay = document.getElementById('ai-oneclick-rewrite-loading-immediate')
-          if (immediateOverlay) {
-            immediateOverlay.remove()
-            console.log('[AI-OneClick-Rewrite] Immediate loading overlay cleaned up')
-          }
-        },
-      })
-    } catch (cleanupError: any) {
-      log('Failed to clean up immediate loading overlay', { error: cleanupError.message })
-    }
+
 
     // Hide loading state (non-blocking)
     try {
@@ -525,21 +777,7 @@ const handleRewrite = async (selection: string, tabId: number) => {
       }
     }
 
-    // Clean up immediate loading overlay on error
-    try {
-      chrome.scripting.executeScript({
-        target: { tabId },
-        func: () => {
-          const immediateOverlay = document.getElementById('ai-oneclick-rewrite-loading-immediate')
-          if (immediateOverlay) {
-            immediateOverlay.remove()
-            console.log('[AI-OneClick-Rewrite] Immediate loading overlay cleaned up (error)')
-          }
-        },
-      })
-    } catch (cleanupError: any) {
-      log('Failed to clean up immediate loading overlay on error', { error: cleanupError.message })
-    }
+
   }
 }
 
@@ -627,112 +865,72 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       timestamp: new Date().toISOString(),
     })
 
-    // Immediately try to show loading via content script injection
-    try {
-      chrome.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => {
-          // Inline loading function to show immediately
-          const showImmediateLoading = () => {
-            const selection = window.getSelection()
-            if (!selection || selection.rangeCount === 0) return
 
-            const range = selection.getRangeAt(0)
-            const rect = range.getBoundingClientRect()
-
-            // Remove any existing loading overlay
-            const existingOverlay = document.getElementById('ai-oneclick-rewrite-loading-immediate')
-            if (existingOverlay) existingOverlay.remove()
-
-            // Create immediate loading overlay
-            const loadingOverlay = document.createElement('div')
-            loadingOverlay.id = 'ai-oneclick-rewrite-loading-immediate'
-
-            const overlayTop = rect.top + window.scrollY - 10
-            const overlayLeft = rect.left + window.scrollX
-            const overlayWidth = Math.max(rect.width, 200)
-            const overlayHeight = rect.height + 20
-
-            Object.assign(loadingOverlay.style, {
-              position: 'fixed',
-              left: `${overlayLeft}px`,
-              top: `${overlayTop}px`,
-              width: `${overlayWidth}px`,
-              height: `${overlayHeight}px`,
-              background: 'rgba(59, 130, 246, 0.08)',
-              border: '2px dashed #3b82f6',
-              borderRadius: '8px',
-              zIndex: '2147483647',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              animation: 'pulseGlow 2s ease-in-out infinite',
-            })
-
-            loadingOverlay.innerHTML = `
-              <div style="
-                background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
-                color: white; 
-                padding: 8px 16px; 
-                border-radius: 20px; 
-                font-size: 13px; 
-                font-weight: 600; 
-                display: flex; 
-                align-items: center; 
-                gap: 8px;
-                box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
-                backdrop-filter: blur(8px);
-                border: 1px solid rgba(255, 255, 255, 0.2);
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              ">
-                <div style="
-                  width: 16px; 
-                  height: 16px; 
-                  border: 2px solid rgba(255,255,255,0.3); 
-                  border-top: 2px solid white; 
-                  border-radius: 50%; 
-                  animation: spin 1s linear infinite;
-                "></div>
-                <span>AI is rewriting your text...</span>
-              </div>
-              <style>
-                @keyframes spin {
-                  0% { transform: rotate(0deg); }
-                  100% { transform: rotate(360deg); }
-                }
-                @keyframes pulseGlow {
-                  0%, 100% { 
-                    border-color: #3b82f6; 
-                    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-                  }
-                  50% { 
-                    border-color: #2563eb; 
-                    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
-                  }
-                }
-              </style>
-            `
-
-            document.body.appendChild(loadingOverlay)
-            console.log('[AI-OneClick-Rewrite] Immediate loading overlay shown')
-          }
-
-          showImmediateLoading()
-        },
-      })
-      log('Immediate loading overlay injected successfully')
-    } catch (injectionError: any) {
-      log('Failed to inject immediate loading overlay', { error: injectionError.message })
-    }
 
     try {
-      await handleRewrite(info.selectionText, tab.id)
+      // Check if page is restricted first
+      const pageRestricted = await isPageRestricted(tab.id)
+      if (pageRestricted) {
+        // Show notification that extension doesn't work on this page
+        try {
+          await chrome.tabs.sendMessage(tab.id, {
+            type: 'show-error',
+            error: 'This extension cannot work on browser system pages. Please try on a regular website.',
+          })
+        } catch (notifyError: any) {
+          // If we can't send message, show a system notification
+          chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'icons/icon48.png',
+            title: 'AI One-Click Rewrite',
+            message: 'This extension cannot work on browser system pages. Please try on a regular website.'
+          })
+        }
+        return
+      }
+      
+      // Ensure content script is ready first
+      const contentScriptReady = await ensureContentScriptReady(tab.id)
+      if (!contentScriptReady) {
+        throw new Error('Content script could not be loaded')
+      }
+      
+      // Check current mode and handle accordingly
+      const cfg = (await chrome.storage.sync.get(DEFAULT_SETTINGS)) as ExtensionSettings
+      
+      if (cfg.mode === 'preview') {
+        // Preview mode: send message to open preview panel
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'show-preview-panel',
+          selectedText: info.selectionText
+        })
+        log('Preview panel opened via context menu')
+      } else {
+        // Auto-replace mode: proceed with immediate rewrite
+        await handleRewrite(info.selectionText, tab.id)
+      }
     } catch (error: any) {
       logError('Context menu rewrite failed', {
         error: error.message,
         tabId: tab.id,
         selectionLength: info.selectionText.length,
       })
+      
+      // Show user-friendly error notification
+      try {
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'show-error',
+          error: 'Extension cannot work on this page. Please try on a regular website like Google Docs, Gmail, or any other website.',
+        })
+      } catch (notifyError: any) {
+        // If we can't send message, show a system notification
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'icons/icon48.png',
+          title: 'AI One-Click Rewrite',
+          message: 'Extension cannot work on this page. Please try on a regular website.'
+        })
+      }
     }
   } else {
     log('Context menu clicked but conditions not met', {
@@ -750,6 +948,8 @@ chrome.action.onClicked.addListener((_tab) => {
   chrome.runtime.openOptionsPage()
 })
 
+
+
 // Track which tabs have ready content scripts
 const readyTabs = new Set<number>()
 
@@ -758,7 +958,7 @@ chrome.runtime.onMessage.addListener(async (message, sender, _sendResponse) => {
   if (message.type === 'content-script-ready' && sender.tab?.id) {
     readyTabs.add(sender.tab.id)
     log('Content script ready for tab:', sender.tab.id)
-    return true
+    return
   }
 
   if (message.type === 'trigger-rewrite' && sender.tab?.id && message.selection) {
@@ -769,9 +969,25 @@ chrome.runtime.onMessage.addListener(async (message, sender, _sendResponse) => {
       timestamp: new Date().toISOString(),
     })
 
-    await handleRewrite(message.selection, sender.tab.id)
+    // Handle rewrite asynchronously without keeping message channel open
+    handleRewrite(message.selection, sender.tab.id).catch((error) => {
+      logError('Background rewrite handler failed', { error: error.message })
+    })
   }
-  return true // Keep message channel open for async response
+
+  if (message.type === 'rewrite-preview' && sender.tab?.id && message.selection) {
+    log('Preview rewrite requested', {
+      tabId: sender.tab.id,
+      selectionLength: message.selection.length,
+      style: message.style,
+      timestamp: new Date().toISOString(),
+    })
+
+    // Handle preview rewrite with custom style
+    handlePreviewRewrite(message.selection, sender.tab.id, message.style, message.customInstructions).catch((error) => {
+      logError('Preview rewrite handler failed', { error: error.message })
+    })
+  }
 })
 
 // Handle regular Chrome runtime messages (for opening options page)
@@ -780,7 +996,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     log('Opening options page via runtime message')
     chrome.runtime.openOptionsPage()
     sendResponse({ success: true })
-    return true
+    return true // Keep channel open for this response
   }
 })
 

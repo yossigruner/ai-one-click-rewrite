@@ -31,7 +31,6 @@ export interface ExtensionSettings {
   customPresets: Record<AIProvider, string>
   mode: 'auto-replace' | 'preview'
   debugLogs: boolean
-  keyboardShortcut: string
 }
 
 // API Response types
@@ -46,38 +45,49 @@ export interface APIResponse {
   }
 }
 
-// Webext-bridge message protocol definitions
-import type { ProtocolWithReturn } from 'webext-bridge'
-
-export interface ProtocolMap {
-  // Background -> Content messages
-  'show-loading': { tabId: number }
-  'hide-loading': { tabId: number }
-  'replace-selection': { tabId: number; rewrittenText: string }
-  'show-error': { tabId: number; error: string }
-
-  // Content -> Background messages
-  'trigger-rewrite': { selection: string; tabId: number }
-  'get-selection': void
+// Preview Mode types
+export interface PreviewModeMessage {
+  type: 'open-preview' | 'close-preview' | 'update-preview' | 'rewrite-preview' | 'apply-preview'
+  selectedText?: string
+  style?: string
+  provider?: AIProvider
+  model?: string
+  tabId?: number
 }
 
-// Create typed protocol
-export type Protocol = ProtocolWithReturn<
-  ProtocolMap,
-  {
-    'get-selection': string
-  }
->
+export interface PreviewResponse {
+  originalText: string
+  rewrittenText: string
+  style: string
+  provider: AIProvider
+  model: string
+  timestamp: number
+  isLoading?: boolean
+}
 
-// Legacy support (can be removed later)
-export type MessageType = keyof ProtocolMap
+export interface PreviewPanelState {
+  isOpen: boolean
+  selectedText: string
+  rewrittenText: string
+  currentStyle: string
+  currentProvider: AIProvider
+  currentModel: string
+  customInstructions: string
+  isLoading: boolean
+  error?: string
+}
 
+// Standard Chrome messaging types
 export interface ChromeMessage {
-  type: MessageType
+  type: string
   data?: any
   selection?: string
   rewrittenText?: string
   error?: string
+  tabId?: number
+  message?: string
+  provider?: string
+  action?: string
 }
 
 // Preset options
@@ -131,6 +141,5 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
     gemini: '',
   },
   mode: 'auto-replace',
-  debugLogs: true,
-  keyboardShortcut: 'Alt+R',
+  debugLogs: false,
 }

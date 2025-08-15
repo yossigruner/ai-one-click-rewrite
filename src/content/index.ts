@@ -2,7 +2,7 @@
 // import { onMessage, sendMessage } from 'webext-bridge/content-script'
 
 // Logging utility
-let isDebugEnabled = true
+let isDebugEnabled = false
 
 const log = (...args: any[]) => {
   if (isDebugEnabled) {
@@ -26,6 +26,17 @@ const updateDebugSetting = async () => {
   }
 }
 
+// Load mode setting
+const updateModeSetting = async () => {
+  try {
+    const result = await chrome.storage.sync.get(['mode'])
+    isPreviewModeEnabled = result.mode === 'preview'
+    log('Preview mode setting loaded:', isPreviewModeEnabled)
+  } catch (error) {
+    console.error('Failed to load mode setting:', error)
+  }
+}
+
 // Get current tab ID (webext-bridge handles this automatically)
 const getCurrentTabId = (): number => {
   // webext-bridge will automatically inject the correct tabId
@@ -36,7 +47,11 @@ const getCurrentTabId = (): number => {
 let floatingButton: HTMLElement | null = null
 let isButtonVisible = false
 let currentSelection = ''
-let loadingOverlay: HTMLElement | null = null
+
+// Preview mode state
+let previewPanel: HTMLElement | null = null
+let isPreviewModeEnabled = false
+let originalSelectionRange: Range | null = null
 
 // Create floating button
 const createFloatingButton = (): HTMLElement => {
@@ -100,6 +115,13 @@ const createFloatingButton = (): HTMLElement => {
       return
     }
 
+    // In preview mode, open the preview panel instead of auto-rewriting
+    if (isPreviewModeEnabled) {
+      openPreviewPanel(currentSelection)
+      return
+    }
+
+    // Auto-replace mode: proceed with immediate rewrite
     showButtonLoading()
     showTextLoading()
 
@@ -199,126 +221,20 @@ const hideButtonLoading = () => {
   })
 }
 
-// Loading overlay for text
+// Loading functions (simplified for Preview Mode)
 const showTextLoading = () => {
-  const selection = window.getSelection()
-  if (!selection || selection.rangeCount === 0) return
-
-  const range = selection.getRangeAt(0)
-  const rect = range.getBoundingClientRect()
-
-  // Create loading overlay
-  loadingOverlay = document.createElement('div')
-  loadingOverlay.id = 'ai-oneclick-rewrite-loading'
-
-  // Position overlay with better visibility
-  const overlayTop = rect.top + window.scrollY - 10
-  const overlayLeft = rect.left + window.scrollX
-  const overlayWidth = Math.max(rect.width, 200) // Minimum width for visibility
-  const overlayHeight = rect.height + 20 // Extra padding
-
-  Object.assign(loadingOverlay.style, {
-    position: 'fixed',
-    left: `${overlayLeft}px`,
-    top: `${overlayTop}px`,
-    width: `${overlayWidth}px`,
-    height: `${overlayHeight}px`,
-    background: 'rgba(59, 130, 246, 0.08)',
-    border: '2px dashed #3b82f6',
-    borderRadius: '8px',
-    zIndex: '2147483646',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    pointerEvents: 'none',
-    animation: 'pulseGlow 2s ease-in-out infinite',
-  })
-
-  // Add enhanced loading indicator
-  loadingOverlay.innerHTML = `
-    <div style="
-      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); 
-      color: white; 
-      padding: 8px 16px; 
-      border-radius: 20px; 
-      font-size: 13px; 
-      font-weight: 600; 
-      display: flex; 
-      align-items: center; 
-      gap: 8px;
-      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
-      backdrop-filter: blur(8px);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    ">
-      <div style="
-        width: 16px; 
-        height: 16px; 
-        border: 2px solid rgba(255,255,255,0.3); 
-        border-top: 2px solid white; 
-        border-radius: 50%; 
-        animation: spin 1s linear infinite;
-      "></div>
-      <span id="loading-message" style="animation: fadeInOut 1.5s ease-in-out infinite;">
-        AI is rewriting your text...
-      </span>
-    </div>
-  `
-
-  // Add enhanced animation styles
-  const style = document.createElement('style')
-  style.id = 'ai-loading-styles'
-  style.textContent = `
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
-    @keyframes pulseGlow {
-      0%, 100% { 
-        border-color: #3b82f6; 
-        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4);
-      }
-      50% { 
-        border-color: #2563eb; 
-        box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.2);
-      }
-    }
-    @keyframes fadeInOut {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
-    }
-  `
-  document.head.appendChild(style)
-
-  document.body.appendChild(loadingOverlay)
-  log('Enhanced text loading overlay shown')
+  // No longer needed with Preview Mode
+  log('Text loading requested (Preview Mode handles this)')
 }
 
-// Update loading message
-const updateLoadingMessage = (message: string) => {
-  if (loadingOverlay) {
-    const messageElement = loadingOverlay.querySelector('#loading-message')
-    if (messageElement) {
-      messageElement.textContent = message
-      log('Loading message updated:', message)
-    }
-  }
+const updateLoadingMessage = (_message: string) => {
+  // No longer needed with Preview Mode
+  log('Loading message update requested (Preview Mode handles this)')
 }
 
-// Hide loading overlay
 const hideTextLoading = () => {
-  if (loadingOverlay) {
-    loadingOverlay.remove()
-    loadingOverlay = null
-
-    // Remove animation styles
-    const style = document.getElementById('ai-loading-styles')
-    if (style) {
-      style.remove()
-    }
-
-    log('Enhanced text loading overlay hidden')
-  }
+  // No longer needed with Preview Mode
+  log('Text loading hide requested (Preview Mode handles this)')
 }
 
 // Replace selected text
@@ -370,6 +286,68 @@ const replaceSelection = (newText: string) => {
   }
 }
 
+// Replace text using stored selection range (for Preview Panel)
+const replaceWithStoredRange = (newText: string) => {
+  if (!originalSelectionRange) {
+    log('No stored selection range found')
+    showErrorNotification('No text selection found to replace')
+    return
+  }
+
+  try {
+    // Handle input fields
+    const activeElement = document.activeElement as HTMLInputElement | HTMLTextAreaElement
+    if (
+      activeElement &&
+      (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA')
+    ) {
+      // For input fields, we need to restore the selection first
+      const selection = window.getSelection()
+      if (selection) {
+        selection.removeAllRanges()
+        selection.addRange(originalSelectionRange)
+      }
+      
+      const start = activeElement.selectionStart || 0
+      const end = activeElement.selectionEnd || 0
+      const currentValue = activeElement.value
+
+      activeElement.value = currentValue.substring(0, start) + newText + currentValue.substring(end)
+      activeElement.selectionStart = start
+      activeElement.selectionEnd = start + newText.length
+
+      // Trigger change event
+      activeElement.dispatchEvent(new Event('input', { bubbles: true }))
+      log('Text replaced in input field using stored range')
+    } else {
+      // Handle regular text content
+      const selection = window.getSelection()
+      if (selection) {
+        selection.removeAllRanges()
+        selection.addRange(originalSelectionRange)
+      }
+
+      originalSelectionRange.deleteContents()
+      originalSelectionRange.insertNode(document.createTextNode(newText))
+
+      // Clear selection
+      selection?.removeAllRanges()
+      log('Text replaced in content using stored range')
+    }
+
+    // Clear stored range
+    originalSelectionRange = null
+    currentSelection = ''
+    hideFloatingButton()
+
+    // Show brief success indication
+    showSuccessNotification('Text applied to page successfully!')
+  } catch (error: any) {
+    logError('Failed to replace with stored range:', error)
+    showErrorNotification('Failed to apply text to page')
+  }
+}
+
 // Show error notification
 const showErrorNotification = (message: string) => {
   const notification = document.createElement('div')
@@ -381,14 +359,18 @@ const showErrorNotification = (message: string) => {
     right: '20px',
     background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
     color: 'white',
-    padding: '12px 16px',
-    borderRadius: '8px',
+    padding: '16px 20px',
+    borderRadius: '12px',
     boxShadow: '0 8px 32px rgba(239, 68, 68, 0.3)',
     zIndex: '2147483647',
     fontSize: '14px',
-    fontWeight: '600',
-    maxWidth: '300px',
+    fontWeight: '500',
+    maxWidth: '350px',
     animation: 'slideInRight 0.3s ease-out',
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '12px',
+    lineHeight: '1.4',
   })
 
   // Add animation styles
@@ -405,7 +387,16 @@ const showErrorNotification = (message: string) => {
   `
   document.head.appendChild(style)
 
-  notification.textContent = message
+  // Add warning icon and message
+  notification.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink: 0; margin-top: 1px;">
+      <path d="M12 9V13M12 17H12.01M21 12C21 16.9706 16.9706 21 12 21C7.02944 21 3 16.9706 3 12C3 7.02944 7.02944 3 12 3C16.9706 3 21 7.02944 21 12Z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div style="flex: 1;">
+      <div style="font-weight: 600; margin-bottom: 4px;">AI Rewrite Error</div>
+      <div style="font-size: 13px; opacity: 0.95;">${message}</div>
+    </div>
+  `
   document.body.appendChild(notification)
 
   // Auto remove after 3 seconds
@@ -672,14 +663,19 @@ const handleSelectionChange = () => {
         log('Text selected:', { length: selectedText.length })
       }
     }
+    
+    // Preview mode is enabled but don't auto-open panel
+    // Panel will only open when user explicitly requests it (right-click or button click)
+    if (isPreviewModeEnabled) {
+      log('Preview mode enabled - text selected but panel not auto-opened')
+    }
   } else {
     currentSelection = ''
     hideFloatingButton()
   }
 }
 
-// Message handlers using webext-bridge
-// Handle messages from background script using standard Chrome messaging
+// Message handlers using standard Chrome messaging
 chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
   switch (message.type) {
     case 'show-loading':
@@ -756,9 +752,83 @@ chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
       hideButtonLoading()
       hideTextLoading()
       break
-  }
 
-  return true // Keep message channel open
+    case 'show-preview-panel':
+      log('Received show-preview-panel message')
+      if (message.selectedText) {
+        openPreviewPanel(message.selectedText)
+      }
+      break
+
+    case 'update-preview-result':
+      log('Received update-preview-result message')
+      const rewrittenTextArea = document.getElementById('rewritten-text') as HTMLTextAreaElement
+      const rewriteBtn = document.getElementById('preview-rewrite-btn') as HTMLButtonElement
+      
+      // Handle error case
+      if (message.error) {
+        log('Preview rewrite error:', message.error)
+        
+        // Show error in the rewritten text area
+        if (rewrittenTextArea) {
+          rewrittenTextArea.value = `❌ Error: ${message.error}`
+          rewrittenTextArea.style.color = '#dc2626'
+          rewrittenTextArea.style.backgroundColor = '#fef2f2'
+          rewrittenTextArea.style.borderColor = '#fca5a5'
+        }
+        
+        // Reset button
+        if (rewriteBtn) {
+          rewriteBtn.disabled = false
+          rewriteBtn.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Rewrite with AI
+          `
+        }
+        
+        // Show error notification
+        showErrorNotification(message.error)
+        break
+      }
+      
+      // Handle success case
+      if (rewrittenTextArea && message.rewrittenText) {
+        rewrittenTextArea.value = message.rewrittenText
+        rewrittenTextArea.style.color = '#374151'
+        rewrittenTextArea.style.backgroundColor = 'white'
+        rewrittenTextArea.style.borderColor = '#e5e7eb'
+      }
+      
+      if (rewriteBtn) {
+        rewriteBtn.disabled = false
+        rewriteBtn.innerHTML = `
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Rewrite with AI
+        `
+      }
+      break
+
+    case 'ping':
+      log('Received ping message')
+      // Content script is ready
+      break
+
+    case 'toggle-preview-mode':
+      log('Received toggle-preview-mode message')
+      isPreviewModeEnabled = message.enabled || false
+      
+      // Close preview panel if it's open and mode is being disabled
+      if (!isPreviewModeEnabled && previewPanel) {
+        closePreviewPanel()
+      }
+      
+      log(`Preview mode ${isPreviewModeEnabled ? 'enabled' : 'disabled'}`)
+      break
+  }
 })
 
 // Storage change listener for debug setting
@@ -771,7 +841,589 @@ chrome.storage.onChanged.addListener((changes) => {
 
 // Initialize
 updateDebugSetting()
+updateModeSetting()
 // setupBridge() // No longer needed with standard Chrome messaging
+
+// Preview Mode Functions
+const createPreviewPanel = (): HTMLElement => {
+  const panel = document.createElement('div')
+  panel.id = 'ai-oneclick-preview-panel'
+  panel.className = 'ai-oneclick-preview-panel'
+  
+  // Add modern styling with animations
+  Object.assign(panel.style, {
+    position: 'fixed',
+    top: '0',
+    right: '0',
+    width: '420px',
+    height: '100vh',
+    background: 'linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)',
+    borderLeft: '1px solid rgba(59, 130, 246, 0.1)',
+    boxShadow: '-8px 0 32px rgba(0, 0, 0, 0.08), -4px 0 16px rgba(59, 130, 246, 0.1)',
+    zIndex: '999999',
+    display: 'flex',
+    flexDirection: 'column',
+    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
+    animation: 'slideInRight 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    backdropFilter: 'blur(20px)',
+  })
+
+  // Add animation styles
+  const style = document.createElement('style')
+  style.textContent = `
+    @keyframes slideInRight {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOutRight {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(100%); opacity: 0; }
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+    @keyframes shimmer {
+      0% { background-position: -200px 0; }
+      100% { background-position: calc(200px + 100%) 0; }
+    }
+  `
+  document.head.appendChild(style)
+
+  // Create header
+  const header = document.createElement('div')
+  header.className = 'ai-oneclick-panel-header'
+  Object.assign(header.style, {
+    padding: '20px 24px',
+    borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+    background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
+    color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'relative',
+    overflow: 'hidden',
+  })
+
+  // Add subtle pattern overlay
+  header.innerHTML = `
+    <div style="
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-image: radial-gradient(circle at 20% 80%, rgba(255,255,255,0.1) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, rgba(255,255,255,0.1) 0%, transparent 50%);
+      pointer-events: none;
+    "></div>
+  `
+
+  const title = document.createElement('h3')
+  title.textContent = 'AI One-Click Rewrite'
+  title.style.margin = '0'
+  title.style.fontSize = '20px'
+  title.style.fontWeight = '700'
+  title.style.letterSpacing = '-0.025em'
+  title.style.position = 'relative'
+  title.style.zIndex = '1'
+
+  const subtitle = document.createElement('div')
+  subtitle.textContent = 'Preview Mode'
+  subtitle.style.fontSize = '13px'
+  subtitle.style.opacity = '0.9'
+  subtitle.style.fontWeight = '500'
+  subtitle.style.marginTop = '2px'
+  subtitle.style.position = 'relative'
+  subtitle.style.zIndex = '1'
+
+  const titleContainer = document.createElement('div')
+  titleContainer.appendChild(title)
+  titleContainer.appendChild(subtitle)
+
+  const closeButton = document.createElement('button')
+  closeButton.innerHTML = `
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M18 6L6 18M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  `
+  closeButton.onclick = () => closePreviewPanel()
+  closeButton.onmouseenter = () => {
+    closeButton.style.background = 'rgba(255, 255, 255, 0.2)'
+    closeButton.style.transform = 'scale(1.05)'
+  }
+  closeButton.onmouseleave = () => {
+    closeButton.style.background = 'rgba(255, 255, 255, 0.1)'
+    closeButton.style.transform = 'scale(1)'
+  }
+  Object.assign(closeButton.style, {
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: 'none',
+    color: 'white',
+    cursor: 'pointer',
+    padding: '8px',
+    borderRadius: '8px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    position: 'relative',
+    zIndex: '1',
+  })
+
+  header.appendChild(titleContainer)
+  header.appendChild(closeButton)
+  panel.appendChild(header)
+
+  // Create content area
+  const content = document.createElement('div')
+  content.className = 'ai-oneclick-panel-content'
+  Object.assign(content.style, {
+    flex: '1',
+    overflow: 'auto',
+    padding: '24px',
+    animation: 'fadeIn 0.4s ease-out 0.1s both',
+  })
+
+  // Add modern content
+  content.innerHTML = `
+    <!-- Writing Style Section -->
+    <div style="margin-bottom: 24px; animation: fadeIn 0.4s ease-out 0.2s both;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+        <div style="
+          width: 24px;
+          height: 24px;
+          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z" fill="white"/>
+          </svg>
+        </div>
+        <label style="font-weight: 600; color: #1f2937; font-size: 14px;">Writing Style</label>
+      </div>
+      
+      <select id="preview-style-select" style="
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 12px;
+        background: white;
+        font-size: 14px;
+        color: #374151;
+        transition: all 0.2s ease;
+        cursor: pointer;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+      ">
+        <option value="Professional concise">✨ Professional & Concise</option>
+        <option value="Friendly & clear">😊 Friendly & Clear</option>
+        <option value="Polish grammar only">📝 Polish Grammar Only</option>
+        <option value="Shorten to 1–2 sentences">⚡ Shorten to 1-2 Sentences</option>
+        <option value="Make it more assertive">💪 Make it More Assertive</option>
+        <option value="Custom">🎨 Custom Instructions...</option>
+      </select>
+    </div>
+    
+    <!-- Custom Instructions Section -->
+    <div id="custom-instructions" style="display: none; margin-bottom: 24px; animation: fadeIn 0.4s ease-out 0.3s both;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+        <div style="
+          width: 24px;
+          height: 24px;
+          background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <label style="font-weight: 600; color: #1f2937; font-size: 14px;">Custom Instructions</label>
+      </div>
+      
+      <textarea id="custom-instructions-text" placeholder="Tell me exactly how you want your text rewritten..." 
+                style="
+                  width: 100%;
+                  min-height: 80px;
+                  padding: 12px 16px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 12px;
+                  background: white;
+                  font-size: 14px;
+                  color: #374151;
+                  resize: vertical;
+                  transition: all 0.2s ease;
+                  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+                  font-family: inherit;
+                "></textarea>
+    </div>
+    
+    <!-- Rewrite Button -->
+    <button id="preview-rewrite-btn" style="
+      width: 100%;
+      padding: 16px;
+      background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+      color: white;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      margin-bottom: 24px;
+      font-weight: 600;
+      font-size: 15px;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      animation: fadeIn 0.4s ease-out 0.4s both;
+    ">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Rewrite with AI
+    </button>
+    
+    <!-- Original Text Section -->
+    <div style="margin-bottom: 24px; animation: fadeIn 0.4s ease-out 0.5s both;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+        <div style="
+          width: 24px;
+          height: 24px;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="14,2 14,8 20,8" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="16" y1="13" x2="8" y2="13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <line x1="16" y1="17" x2="8" y2="17" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <polyline points="10,9 9,9 8,9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <label style="font-weight: 600; color: #1f2937; font-size: 14px;">Original Text</label>
+      </div>
+      
+      <textarea id="original-text" readonly 
+                style="
+                  width: 100%;
+                  min-height: 120px;
+                  padding: 16px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 12px;
+                  background: #f9fafb;
+                  font-size: 14px;
+                  color: #6b7280;
+                  resize: vertical;
+                  font-family: inherit;
+                  line-height: 1.5;
+                "></textarea>
+    </div>
+    
+    <!-- Rewritten Text Section -->
+    <div style="animation: fadeIn 0.4s ease-out 0.6s both;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+        <div style="
+          width: 24px;
+          height: 24px;
+          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+          border-radius: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        ">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z" fill="white"/>
+          </svg>
+        </div>
+        <label style="font-weight: 600; color: #1f2937; font-size: 14px;">Rewritten Text</label>
+      </div>
+      
+      <textarea id="rewritten-text" 
+                style="
+                  width: 100%;
+                  min-height: 120px;
+                  padding: 16px;
+                  border: 2px solid #e5e7eb;
+                  border-radius: 12px;
+                  background: white;
+                  font-size: 14px;
+                  color: #374151;
+                  resize: vertical;
+                  font-family: inherit;
+                  line-height: 1.5;
+                  transition: all 0.2s ease;
+                "></textarea>
+      
+      <!-- Action Button -->
+      <div style="margin-top: 16px;">
+        <button id="apply-btn" style="
+          width: 100%;
+          padding: 12px 16px;
+          background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+          color: white;
+          border: none;
+          border-radius: 10px;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 14px;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        ">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20 6L9 17l-5-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Apply to Page
+        </button>
+      </div>
+      
+      <!-- AI Model Indicator -->
+      <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e5e7eb; animation: fadeIn 0.4s ease-out 0.7s both;">
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
+          <div style="
+            width: 20px;
+            height: 20px;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+          ">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M12 2L15.09 8.26L22 9L17 14L18.18 21L12 17.77L5.82 21L7 14L2 9L8.91 8.26L12 2Z" fill="white"/>
+            </svg>
+          </div>
+          <label style="font-weight: 600; color: #6b7280; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">AI Model</label>
+        </div>
+        <div id="ai-model-indicator" style="
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          background: #f8fafc;
+          border: 1px solid #e5e7eb;
+          border-radius: 8px;
+          font-size: 13px;
+          color: #374151;
+        ">
+          <div id="ai-provider-icon" style="
+            width: 16px;
+            height: 16px;
+            border-radius: 3px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 700;
+            color: white;
+          "></div>
+          <span id="ai-model-text" style="font-weight: 500;">Loading...</span>
+        </div>
+      </div>
+    </div>
+  `
+
+  panel.appendChild(content)
+  return panel
+}
+
+const openPreviewPanel = (selectedText: string) => {
+  log('Opening preview panel with text:', selectedText.substring(0, 50) + '...')
+  
+  // Store the original selection range before opening panel
+  const selection = window.getSelection()
+  if (selection && selection.rangeCount > 0) {
+    originalSelectionRange = selection.getRangeAt(0).cloneRange()
+    log('Original selection range stored')
+  }
+  
+  // Remove existing panel if any
+  if (previewPanel) {
+    document.body.removeChild(previewPanel)
+  }
+
+  // Create new panel
+  previewPanel = createPreviewPanel()
+  document.body.appendChild(previewPanel)
+
+  // Set original text
+  const originalTextArea = document.getElementById('original-text') as HTMLTextAreaElement
+  if (originalTextArea) {
+    originalTextArea.value = selectedText
+  }
+
+  // Load and display AI model information
+  loadAIModelInfo()
+
+  // Handle style selection
+  const styleSelect = document.getElementById('preview-style-select') as HTMLSelectElement
+  const customInstructions = document.getElementById('custom-instructions') as HTMLElement
+  const customInstructionsText = document.getElementById('custom-instructions-text') as HTMLTextAreaElement
+
+  if (styleSelect) {
+    styleSelect.onchange = () => {
+      if (styleSelect.value === 'Custom') {
+        customInstructions.style.display = 'block'
+      } else {
+        customInstructions.style.display = 'none'
+      }
+    }
+  }
+
+  // Handle rewrite button
+  const rewriteBtn = document.getElementById('preview-rewrite-btn') as HTMLButtonElement
+  if (rewriteBtn) {
+    rewriteBtn.onclick = async () => {
+      const style = styleSelect?.value || 'Professional concise'
+      const customInstructions = customInstructionsText?.value || ''
+      
+      await handlePreviewRewrite(selectedText, style, customInstructions)
+    }
+  }
+
+  // Handle apply button
+  const applyBtn = document.getElementById('apply-btn') as HTMLButtonElement
+  if (applyBtn) {
+    applyBtn.onclick = () => {
+      const rewrittenText = (document.getElementById('rewritten-text') as HTMLTextAreaElement)?.value
+      if (rewrittenText && !rewrittenText.startsWith('❌ Error:')) {
+        replaceWithStoredRange(rewrittenText)
+        closePreviewPanel()
+      } else if (rewrittenText?.startsWith('❌ Error:')) {
+        showErrorNotification('Cannot apply error message to page. Please try rewriting again.')
+      } else {
+        showErrorNotification('No rewritten text to apply')
+      }
+    }
+  }
+
+
+}
+
+// Load and display AI model information
+const loadAIModelInfo = async () => {
+  try {
+    const result = await chrome.storage.sync.get(['provider', 'models'])
+    const provider = result.provider || 'openai'
+    const models = result.models || {}
+    const model = models[provider] || 'gpt-4o-mini'
+    
+    const providerIcon = document.getElementById('ai-provider-icon') as HTMLElement
+    const modelText = document.getElementById('ai-model-text') as HTMLElement
+    
+    if (providerIcon && modelText) {
+      // Set provider icon and color
+      const providerColors = {
+        openai: { bg: '#10a37f', text: 'O' },
+        anthropic: { bg: '#d97706', text: 'C' },
+        gemini: { bg: '#4285f4', text: 'G' }
+      }
+      
+      const color = providerColors[provider as keyof typeof providerColors] || providerColors.openai
+      providerIcon.style.background = color.bg
+      providerIcon.textContent = color.text
+      
+      // Set model text
+      const modelNames = {
+        'gpt-4o-mini': 'GPT-4o Mini',
+        'gpt-4o': 'GPT-4o',
+        'claude-3-haiku-20240307': 'Claude Haiku',
+        'claude-3-sonnet-20240229': 'Claude Sonnet',
+        'claude-3-opus-20240229': 'Claude Opus',
+        'gemini-1.5-flash-latest': 'Gemini Flash',
+        'gemini-1.5-pro-latest': 'Gemini Pro'
+      }
+      
+      const displayName = modelNames[model as keyof typeof modelNames] || model
+      modelText.textContent = `${displayName} (${provider.charAt(0).toUpperCase() + provider.slice(1)})`
+      
+      log('AI model info loaded:', { provider, model, displayName })
+    }
+  } catch (error) {
+    logError('Failed to load AI model info:', error)
+    const modelText = document.getElementById('ai-model-text') as HTMLElement
+    if (modelText) {
+      modelText.textContent = 'Settings not found'
+    }
+  }
+}
+
+const closePreviewPanel = () => {
+  if (previewPanel) {
+    // Add slide out animation
+    previewPanel.style.animation = 'slideOutRight 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+    
+    setTimeout(() => {
+      if (previewPanel && previewPanel.parentNode) {
+        document.body.removeChild(previewPanel)
+        previewPanel = null
+      }
+      // Clear stored selection range when panel closes
+      originalSelectionRange = null
+    }, 300)
+  }
+}
+
+const handlePreviewRewrite = async (text: string, style: string, customInstructions: string) => {
+  const rewriteBtn = document.getElementById('preview-rewrite-btn') as HTMLButtonElement
+  
+  if (rewriteBtn) {
+    rewriteBtn.disabled = true
+    rewriteBtn.textContent = 'Processing...'
+  }
+
+  try {
+    // Send message to background script for AI processing
+    chrome.runtime.sendMessage({
+      type: 'rewrite-preview',
+      selection: text,
+      style: style,
+      customInstructions: customInstructions,
+      tabId: getCurrentTabId(),
+    })
+  } catch (error: any) {
+    logError('Failed to send preview rewrite message:', error)
+    if (rewriteBtn) {
+      rewriteBtn.disabled = false
+      rewriteBtn.textContent = 'Rewrite Text'
+    }
+  }
+}
+
+// Storage change listener for mode updates
+chrome.storage.onChanged.addListener((changes) => {
+  if (changes.mode) {
+    isPreviewModeEnabled = changes.mode.newValue === 'preview'
+    log('Preview mode setting changed:', isPreviewModeEnabled)
+    
+    // Show mode change notification
+    if (isPreviewModeEnabled) {
+      showSuccessNotification('Preview Mode enabled - Select text to open side panel')
+    } else {
+      showSuccessNotification('Auto-Replace Mode enabled - Click button for instant rewrite')
+    }
+  }
+  if (changes.debugLogs) {
+    isDebugEnabled = changes.debugLogs.newValue !== false
+  }
+})
 
 // Event listeners
 document.addEventListener('selectionchange', handleSelectionChange)

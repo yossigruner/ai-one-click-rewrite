@@ -32,7 +32,7 @@ async function convertSvgToPng(svgPath, pngPath, size) {
     if (sharp) {
       // Using Sharp (recommended)
       await sharp(svgPath).resize(size, size).png().toFile(pngPath)
-      console.log(`✅ Generated ${path.basename(pngPath)} using Sharp`)
+      console.log(`✅ Generated ${path.basename(pngPath)} (${size}x${size}) using Sharp`)
     } else {
       // Fallback: Create a simple colored PNG using Canvas API simulation
       console.log(`⚠️  Cannot convert ${svgPath} - Sharp not available`)
@@ -47,21 +47,22 @@ async function convertSvgToPng(svgPath, pngPath, size) {
 async function generateIcons() {
   console.log('🎨 Generating Chrome Extension icons...\n')
 
-  for (const size of SIZES) {
-    const svgFile = size === 128 ? 'icon.svg' : `icon${size}.svg`
-    const svgPath = path.join(ICONS_DIR, svgFile)
-    const pngPath = path.join(ICONS_DIR, `icon${size}.png`)
+  const svgPath = path.join(ICONS_DIR, 'icon.svg')
 
-    try {
-      // Check if SVG file exists
-      await fs.access(svgPath)
+  try {
+    // Check if main SVG file exists
+    await fs.access(svgPath)
+    
+    // Generate all sizes from the main SVG
+    for (const size of SIZES) {
+      const pngPath = path.join(ICONS_DIR, `icon${size}.png`)
       await convertSvgToPng(svgPath, pngPath, size)
-    } catch (error) {
-      if (error.code === 'ENOENT') {
-        console.log(`⏭️  Skipping ${svgFile} (file not found)`)
-      } else {
-        console.error(`❌ Error processing ${svgFile}:`, error.message)
-      }
+    }
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      console.log(`❌ Main SVG file not found: ${svgPath}`)
+    } else {
+      console.error(`❌ Error processing SVG:`, error.message)
     }
   }
 

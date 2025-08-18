@@ -31,6 +31,7 @@ export interface ExtensionSettings {
   customPresets: Record<AIProvider, string>
   mode: 'auto-replace' | 'preview'
   debugLogs: boolean
+  autoDetection: 'always' | 'right-click-only' | 'disabled'
 }
 
 // API Response types
@@ -142,4 +143,5 @@ export const DEFAULT_SETTINGS: ExtensionSettings = {
   },
   mode: 'auto-replace',
   debugLogs: false,
+  autoDetection: 'always',
 }

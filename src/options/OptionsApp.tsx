@@ -2,12 +2,14 @@ import DebugSection from '@/components/DebugSection'
 import HeaderSection from '@/components/HeaderSection'
 import ModeSection from '@/components/ModeSection'
 import ProviderSection from '@/components/ProviderSection'
+import AutoDetectionSection from '@/components/AutoDetectionSection'
 import { DEFAULT_SETTINGS, ExtensionSettings } from '@/types'
 import { loadSettings, saveSettings } from '@/utils/storage'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import BugReportIcon from '@mui/icons-material/BugReport'
 import EditIcon from '@mui/icons-material/Edit'
 import SmartToyIcon from '@mui/icons-material/SmartToy'
+import SettingsIcon from '@mui/icons-material/Settings'
 import {
   Alert,
   Box,
@@ -72,6 +74,30 @@ const OptionsApp: React.FC = () => {
           console.log(`Preview mode ${updates.mode === 'preview' ? 'enabled' : 'disabled'} for all tabs`)
         } catch (error) {
           console.error('Failed to notify content scripts about mode change:', error)
+        }
+      }
+
+      // Notify content scripts about auto-detection changes
+      if (updates.autoDetection !== undefined) {
+        try {
+          // Get all tabs and notify them about the auto-detection change
+          const tabs = await chrome.tabs.query({})
+          for (const tab of tabs) {
+            if (tab.id) {
+              try {
+                await chrome.tabs.sendMessage(tab.id, {
+                  type: 'update-auto-detection',
+                  mode: updates.autoDetection
+                })
+              } catch (error) {
+                // Ignore errors for tabs that don't have content scripts
+                console.log(`Could not send message to tab ${tab.id}:`, error)
+              }
+            }
+          }
+          console.log(`Auto-detection mode changed to: ${updates.autoDetection}`)
+        } catch (error) {
+          console.error('Failed to notify content scripts about auto-detection change:', error)
         }
       }
     } catch (error) {
@@ -159,6 +185,7 @@ const OptionsApp: React.FC = () => {
           >
             <Tab icon={<SmartToyIcon />} label="AI Provider" iconPosition="start" />
             <Tab icon={<EditIcon />} label="Rewrite Mode" iconPosition="start" />
+            <Tab icon={<SettingsIcon />} label="Auto-Detection" iconPosition="start" />
             <Tab icon={<BugReportIcon />} label="Debug" iconPosition="start" />
           </Tabs>
         </Paper>
@@ -200,9 +227,16 @@ const OptionsApp: React.FC = () => {
             </Box>
           </Fade>
 
-          {/* Debug Settings Tab */}
+          {/* Auto-Detection Settings Tab */}
           <Fade in={activeTab === 2} timeout={300}>
             <Box sx={{ display: activeTab === 2 ? 'block' : 'none' }}>
+              <AutoDetectionSection settings={settings} onSettingsChange={handleSettingsChange} />
+            </Box>
+          </Fade>
+
+          {/* Debug Settings Tab */}
+          <Fade in={activeTab === 3} timeout={300}>
+            <Box sx={{ display: activeTab === 3 ? 'block' : 'none' }}>
               <Paper 
                 elevation={0} 
                 sx={{ 

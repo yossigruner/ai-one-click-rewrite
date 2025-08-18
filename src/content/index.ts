@@ -37,6 +37,17 @@ const updateModeSetting = async () => {
   }
 }
 
+// Load auto-detection setting
+const updateAutoDetectionSetting = async () => {
+  try {
+    const result = await chrome.storage.sync.get(['autoDetection'])
+    autoDetectionMode = result.autoDetection || 'always'
+    log('Auto-detection setting loaded:', autoDetectionMode)
+  } catch (error) {
+    console.error('Failed to load auto-detection setting:', error)
+  }
+}
+
 // Get current tab ID (webext-bridge handles this automatically)
 const getCurrentTabId = (): number => {
   // webext-bridge will automatically inject the correct tabId
@@ -52,6 +63,9 @@ let currentSelection = ''
 let previewPanel: HTMLElement | null = null
 let isPreviewModeEnabled = false
 let originalSelectionRange: Range | null = null
+
+// Auto-detection state
+let autoDetectionMode: 'always' | 'right-click-only' | 'disabled' = 'always'
 
 // Create floating button
 const createFloatingButton = (): HTMLElement => {
@@ -653,7 +667,20 @@ const handleSelectionChange = () => {
   if (selectedText && selectedText.length > 0) {
     currentSelection = selectedText
 
-    // Get selection position
+    // Check auto-detection setting
+    if (autoDetectionMode === 'disabled') {
+      // Don't show any visual feedback
+      log('Auto-detection disabled - no visual feedback for text selection')
+      return
+    }
+
+    if (autoDetectionMode === 'right-click-only') {
+      // Don't show floating button, but still track selection for context menu
+      log('Right-click only mode - no floating button shown')
+      return
+    }
+
+    // Auto-detection mode is 'always' - show floating button
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0)
       const rect = range.getBoundingClientRect()
@@ -817,6 +844,16 @@ chrome.runtime.onMessage.addListener((message, _sender, _sendResponse) => {
       // Content script is ready
       break
 
+    case 'update-auto-detection':
+      log('Received update-auto-detection message:', message.mode)
+      autoDetectionMode = message.mode as 'always' | 'right-click-only' | 'disabled'
+      
+      // Hide floating button if auto-detection is disabled or set to right-click-only
+      if (autoDetectionMode !== 'always') {
+        hideFloatingButton()
+      }
+      break
+
     case 'toggle-preview-mode':
       log('Received toggle-preview-mode message')
       isPreviewModeEnabled = message.enabled || false
@@ -842,6 +879,7 @@ chrome.storage.onChanged.addListener((changes) => {
 // Initialize
 updateDebugSetting()
 updateModeSetting()
+updateAutoDetectionSetting()
 // setupBridge() // No longer needed with standard Chrome messaging
 
 // Preview Mode Functions
@@ -1413,6 +1451,13 @@ chrome.storage.onChanged.addListener((changes) => {
     isPreviewModeEnabled = changes.mode.newValue === 'preview'
     log('Preview mode setting changed:', isPreviewModeEnabled)
     
+    // Close preview panel if it's open and mode is being disabled
+    if (!isPreviewModeEnabled && previewPanel) {
+      closePreviewPanel()
+    }
+    
+    log(`Preview mode ${isPreviewModeEnabled ? 'enabled' : 'disabled'}`)
+    
     // Show mode change notification
     if (isPreviewModeEnabled) {
       showSuccessNotification('Preview Mode enabled - Select text to open side panel')
@@ -1423,7 +1468,31 @@ chrome.storage.onChanged.addListener((changes) => {
   if (changes.debugLogs) {
     isDebugEnabled = changes.debugLogs.newValue !== false
   }
+  if (changes.autoDetection) {
+    autoDetectionMode = changes.autoDetection.newValue as 'always' | 'right-click-only' | 'disabled'
+    log('Auto-detection setting changed:', autoDetectionMode)
+    
+    // Hide floating button if auto-detection is disabled or set to right-click-only
+    if (autoDetectionMode !== 'always') {
+      hideFloatingButton()
+    }
+    
+    // Show setting change notification
+    switch (autoDetectionMode) {
+      case 'always':
+        showSuccessNotification('Floating button enabled - Shows on text selection')
+        break
+      case 'right-click-only':
+        showSuccessNotification('Right-click only mode - Use context menu to rewrite')
+        break
+      case 'disabled':
+        showSuccessNotification('Auto-detection disabled - Use extension icon in toolbar')
+        break
+    }
+  }
 })
+
+
 
 // Event listeners
 document.addEventListener('selectionchange', handleSelectionChange)

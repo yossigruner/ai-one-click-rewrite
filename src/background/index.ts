@@ -898,7 +898,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
       // Check current mode and handle accordingly
       const cfg = (await chrome.storage.sync.get(DEFAULT_SETTINGS)) as ExtensionSettings
       
-      if (cfg.mode === 'preview') {
+      // Check if this is LinkedIn (contenteditable messaging interface)
+      const isLinkedIn = tab.url && tab.url.includes('linkedin.com')
+      
+      if (isLinkedIn) {
+        // For LinkedIn, always use inline AI icon behavior (no preview panel)
+        log('LinkedIn detected - using inline AI icon behavior instead of preview panel')
+        await handleRewrite(info.selectionText, tab.id)
+      } else if (cfg.mode === 'preview') {
         // Preview mode: send message to open preview panel
         await chrome.tabs.sendMessage(tab.id, {
           type: 'show-preview-panel',

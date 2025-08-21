@@ -90,8 +90,8 @@ const isPageRestricted = async (tabId: number): Promise<boolean> => {
       'chrome-search://',
       'chrome-devtools://',
       'view-source:',
-      'data:',
-      'file://'
+      'data:'
+      // Note: Removed 'file://' to allow local testing
     ]
     
     return restrictedPatterns.some(pattern => url.startsWith(pattern))

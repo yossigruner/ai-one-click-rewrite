@@ -1672,6 +1672,41 @@ const addInlineIconStyles = () => {
     .ai-oneclick-input-with-icon {
       padding-right: 36px !important;
     }
+    
+    /* Jira-specific styles */
+    .ai-oneclick-jira-icon {
+      position: absolute !important;
+      top: 50% !important;
+      right: 8px !important;
+      transform: translateY(-50%) !important;
+      z-index: 1000 !important;
+      opacity: 0 !important;
+      transition: opacity 0.2s ease !important;
+      pointer-events: none !important;
+      width: 18px !important;
+      height: 18px !important;
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+      border-radius: 50% !important;
+      cursor: pointer !important;
+      display: flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+      box-shadow: 0 2px 6px rgba(37, 99, 235, 0.3) !important;
+      border: 1px solid rgba(255, 255, 255, 0.8) !important;
+    }
+    
+    .ai-oneclick-jira-icon:hover {
+      opacity: 1 !important;
+      transform: translateY(-50%) scale(1.05) !important;
+      box-shadow: 0 3px 12px rgba(37, 99, 235, 0.5) !important;
+    }
+    
+    .ai-oneclick-jira-icon svg {
+      width: 10px !important;
+      height: 10px !important;
+      color: white !important;
+      fill: currentColor !important;
+    }
   `
   document.head.appendChild(style)
 }
@@ -1746,6 +1781,12 @@ const setupInputField = (input: HTMLInputElement | HTMLTextAreaElement) => {
   // Skip if input is too small or hidden
   const rect = input.getBoundingClientRect()
   if (rect.width < 50 || rect.height < 20) return
+
+  // Special handling for Jira fields
+  if (isJiraField(input)) {
+    setupJiraField(input)
+    return
+  }
 
   input.dataset.aiOneclickSetup = 'true'
 
@@ -1916,3 +1957,175 @@ log('Content script loaded and ready')
 
 // Initialize inline AI icons for input fields
 initializeInlineAIIcons()
+
+// Jira-specific field detection and handling
+const isJiraField = (input: HTMLInputElement | HTMLTextAreaElement): boolean => {
+  // Check if we're on Jira
+  if (!window.location.hostname.includes('atlassian.net') && !window.location.hostname.includes('jira.com')) {
+    return false
+  }
+
+  // Check for Jira-specific selectors and attributes
+  const jiraSelectors = [
+    '[data-testid*="issue-field"]',
+    '[data-testid*="inline-edit"]',
+    '[data-vc*="issue-field"]',
+    '.css-1jg7pxs', // Jira field container class
+    '._2rko1sit', // Jira field class
+  ]
+
+  // Check if the input or any of its parents match Jira selectors
+  let element: Element | null = input
+  while (element) {
+    for (const selector of jiraSelectors) {
+      if (element.matches(selector)) {
+        return true
+      }
+    }
+    element = element.parentElement
+  }
+
+  return false
+}
+
+const setupJiraField = (input: HTMLInputElement | HTMLTextAreaElement) => {
+  // Skip if already setup
+  if (input.dataset.aiOneclickSetup) return
+
+  input.dataset.aiOneclickSetup = 'true'
+  log('Setting up Jira field:', input)
+
+  // For Jira fields, we need to be more careful with DOM manipulation
+  // Instead of wrapping, we'll add the icon to the existing container
+  let container = input.parentElement
+  
+  // Find the appropriate container for Jira fields
+  while (container && !container.matches('[data-testid*="issue-field"], [data-vc*="issue-field"]')) {
+    container = container.parentElement
+  }
+
+  if (!container) {
+    log('Could not find suitable Jira container for:', input)
+    return
+  }
+
+  // Check if icon already exists
+  if (container.querySelector('.ai-oneclick-icon')) {
+    return
+  }
+
+  // Create AI icon with Jira-specific positioning
+  const icon = createJiraAIIcon(input)
+  
+  // Add icon to container with Jira-specific styling
+  container.style.position = 'relative'
+  container.appendChild(icon)
+
+  // Add event listeners with Jira-specific handling
+  setupJiraEventListeners(input, icon, container)
+}
+
+const createJiraAIIcon = (input: HTMLInputElement | HTMLTextAreaElement): HTMLElement => {
+  const icon = document.createElement('div')
+  icon.className = 'ai-oneclick-icon ai-oneclick-jira-icon'
+
+  // AI robot SVG icon
+  icon.innerHTML = `
+    <svg viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 7.5V9H21ZM3 9H9V7.5L3 7V9ZM15 11.5V13H9V11.5H15ZM21 13V15H15V13H21ZM9 13V15H3V13H9ZM12 15.5C10.62 15.5 9.5 16.62 9.5 18S10.62 20.5 12 20.5 14.5 18.88 14.5 18 13.38 15.5 12 15.5Z"/>
+    </svg>
+    <div class="ai-oneclick-tooltip">Rewrite with AI</div>
+  `
+
+  // Jira-specific positioning
+  Object.assign(icon.style, {
+    position: 'absolute',
+    top: '50%',
+    right: '8px',
+    transform: 'translateY(-50%)',
+    zIndex: '1000',
+    cursor: 'pointer',
+    opacity: '0',
+    transition: 'opacity 0.2s ease',
+    pointerEvents: 'none',
+  })
+
+  // Click handler
+  icon.addEventListener('click', (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    handleIconClick(input, icon)
+  })
+
+  return icon
+}
+
+const setupJiraEventListeners = (
+  input: HTMLInputElement | HTMLTextAreaElement,
+  icon: HTMLElement,
+  container: Element
+) => {
+  let focusTimeout: number
+  let isEditing = false
+
+  const showIcon = () => {
+    const hasText = getInputValue(input).trim().length > 0
+    if (hasText && isEditing) {
+      icon.style.opacity = '1'
+      icon.style.pointerEvents = 'auto'
+    }
+  }
+
+  const hideIcon = () => {
+    clearTimeout(focusTimeout)
+    focusTimeout = setTimeout(() => {
+      icon.style.opacity = '0'
+      icon.style.pointerEvents = 'none'
+    }, 100)
+  }
+
+  const updateIconVisibility = () => {
+    const hasText = getInputValue(input).trim().length > 0
+    if (isEditing && hasText) {
+      showIcon()
+    } else {
+      hideIcon()
+    }
+  }
+
+  // Monitor for Jira's edit mode changes
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'attributes' && mutation.attributeName === 'aria-hidden') {
+        const target = mutation.target as Element
+        isEditing = target.getAttribute('aria-hidden') === 'false'
+        updateIconVisibility()
+      }
+    })
+  })
+
+  // Observe the container for edit mode changes
+  observer.observe(container, {
+    attributes: true,
+    attributeFilter: ['aria-hidden'],
+    subtree: true,
+  })
+
+  // Standard input events
+  input.addEventListener('focus', () => {
+    isEditing = true
+    showIcon()
+  })
+  
+  input.addEventListener('blur', () => {
+    isEditing = false
+    hideIcon()
+  })
+  
+  input.addEventListener('input', updateIconVisibility)
+  
+  icon.addEventListener('mouseenter', () => clearTimeout(focusTimeout))
+  icon.addEventListener('mouseleave', () => {
+    if (!isEditing) hideIcon()
+  })
+}

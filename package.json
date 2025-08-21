@@ -1,6 +1,6 @@
 {
   "name": "ai-one-click-rewrite",
-  "version": "2.1.0",
+  "version": "2.0.2",
   "description": "AI-powered text rewriting Chrome extension with React + TypeScript",
   "author": "Yossi Gruner <yossigruner@gmail.com>",
   "repository": {

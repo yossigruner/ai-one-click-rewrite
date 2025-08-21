@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AI One‑Click Rewrite",
-  "version": "2.1.0",
+  "version": "2.0.2",
   "description": "Instantly rewrite selected text using AI providers (OpenAI, Anthropic, Google Gemini)",
   "author": "Yossi Gruner",
   "homepage_url": "https://github.com/yossigruner/ai-one-click-rewrite",

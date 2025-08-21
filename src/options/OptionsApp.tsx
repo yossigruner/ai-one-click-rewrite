@@ -160,6 +160,7 @@ const OptionsApp: React.FC = () => {
           <Tabs
             value={activeTab}
             onChange={handleTabChange}
+            centered
             sx={{
               backgroundColor: '#fff',
               '& .MuiTab-root': {

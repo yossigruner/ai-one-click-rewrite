@@ -15,7 +15,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build && npm run post-build",
-    "post-build": "cp dist/src/options/index.html dist/options.html && sed -i '' 's|src=\"/|src=\"|g; s|href=\"/|href=\"|g' dist/options.html",
+    "post-build": "cp dist/src/options/index.html dist/options.html && sed -i '' 's|src=\"/|src=\"|g; s|href=\"/|href=\"|g' dist/options.html && cp public/manifest.json dist/manifest.json",
     "preview": "vite preview",
     "type-check": "tsc --noEmit",
     "lint": "eslint . --ext ts,tsx,js,jsx --report-unused-disable-directives --max-warnings 0",

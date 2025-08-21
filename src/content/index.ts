@@ -685,6 +685,22 @@ const handleSelectionChange = () => {
       const range = selection.getRangeAt(0)
       const rect = range.getBoundingClientRect()
 
+      // Check if we're in an input field that has inline AI icons
+      const activeElement = document.activeElement as HTMLElement
+      const isInputField = activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' ||
+        activeElement.contentEditable === 'true' || 
+        activeElement.contentEditable === ''
+      )
+      
+      // Don't show floating button if we're in an input field (inline AI icon will handle it)
+      if (isInputField) {
+        log('Text selected in input field - using inline AI icon instead of floating button')
+        hideFloatingButton()
+        return
+      }
+
       if (rect.width > 0 && rect.height > 0) {
         showFloatingButton(rect.left + rect.width / 2, rect.top + window.scrollY)
         log('Text selected:', { length: selectedText.length })

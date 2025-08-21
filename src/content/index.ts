@@ -696,8 +696,8 @@ const handleSelectionChange = () => {
 
     // Auto-detection mode is 'always' - show floating button
     if (selection && selection.rangeCount > 0) {
-      const range = selection.getRangeAt(0)
-      const rect = range.getBoundingClientRect()
+      // const range = selection.getRangeAt(0) // Temporarily disabled
+      // const rect = range.getBoundingClientRect() // Temporarily disabled
 
       // Check if we're in an input field that has inline AI icons
       const activeElement = document.activeElement as HTMLElement
@@ -715,10 +715,12 @@ const handleSelectionChange = () => {
         return
       }
 
-      if (rect.width > 0 && rect.height > 0) {
-        showFloatingButton(rect.left + rect.width / 2, rect.top + window.scrollY)
-        log('Text selected:', { length: selectedText.length })
-      }
+      // Floating button temporarily disabled
+      // if (rect.width > 0 && rect.height > 0) {
+      //   showFloatingButton(rect.left + rect.width / 2, rect.top + window.scrollY)
+      //   log('Text selected:', { length: selectedText.length })
+      // }
+      log('Text selected (floating button disabled):', { length: selectedText.length })
     }
     
     // Preview mode is enabled but don't auto-open panel

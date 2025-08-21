@@ -35,30 +35,29 @@ const AutoDetectionSection: React.FC<AutoDetectionSectionProps> = ({
   }
 
   return (
-    <Box sx={{ maxWidth: 800, mx: 'auto', p: 3 }}>
+    <Box sx={{ p: 4 }}>
       {/* Header */}
-      <Box sx={{ mb: 4, textAlign: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
         <Box
           sx={{
-            display: 'inline-flex',
+            width: 48,
+            height: 48,
+            borderRadius: 2,
+            display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)',
-            mb: 2,
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #e9ecef',
           }}
         >
-          <SettingsIcon sx={{ fontSize: 32, color: 'white' }} />
+          <SettingsIcon sx={{ color: '#666', fontSize: 24 }} />
         </Box>
-        <Typography variant="h4" component="h1" sx={{ fontWeight: 700, mb: 1 }}>
-          Auto-Detection Settings
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600, mx: 'auto' }}>
-          Control how the extension detects and responds to text selection on web pages
-        </Typography>
+        <Typography variant="h4">Auto-Detection Settings</Typography>
       </Box>
+
+      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+        Control how the extension detects and responds to text selection on web pages
+      </Typography>
 
       {/* Main Content Card */}
       <Box

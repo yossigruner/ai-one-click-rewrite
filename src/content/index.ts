@@ -140,6 +140,11 @@ const createFloatingButton = (): HTMLElement => {
     showTextLoading()
 
     try {
+      // Check if extension context is still valid
+      if (!chrome.runtime?.id) {
+        throw new Error('Extension context invalidated - please reload the page')
+      }
+
       chrome.runtime.sendMessage({
         type: 'trigger-rewrite',
         selection: currentSelection,
@@ -147,7 +152,16 @@ const createFloatingButton = (): HTMLElement => {
       })
     } catch (error: any) {
       logError('Failed to send rewrite message:', error)
-      showErrorNotification('Failed to communicate with extension')
+      
+      // Handle specific error types
+      if (error.message?.includes('Extension context invalidated')) {
+        showErrorNotification('Extension was reloaded. Please refresh the page to continue using the extension.')
+      } else if (error.message?.includes('Receiving end does not exist')) {
+        showErrorNotification('Extension connection lost. Please refresh the page.')
+      } else {
+        showErrorNotification('Failed to communicate with extension. Please try again.')
+      }
+      
       hideButtonLoading()
       hideTextLoading()
     }
@@ -1866,6 +1880,11 @@ const handleIconClick = async (
   icon.classList.add('loading')
 
   try {
+    // Check if extension context is still valid
+    if (!chrome.runtime?.id) {
+      throw new Error('Extension context invalidated - please reload the page')
+    }
+
     // Send to background for rewriting
     chrome.runtime.sendMessage({
       type: 'trigger-rewrite',
@@ -1879,7 +1898,15 @@ const handleIconClick = async (
   } catch (error: any) {
     logError('Failed to send inline rewrite message:', error)
     icon.classList.remove('loading')
-    showErrorNotification('Failed to communicate with extension')
+    
+    // Handle specific error types
+    if (error.message?.includes('Extension context invalidated')) {
+      showErrorNotification('Extension was reloaded. Please refresh the page to continue using the extension.')
+    } else if (error.message?.includes('Receiving end does not exist')) {
+      showErrorNotification('Extension connection lost. Please refresh the page.')
+    } else {
+      showErrorNotification('Failed to communicate with extension. Please try again.')
+    }
   }
 }
 

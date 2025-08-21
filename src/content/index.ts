@@ -1955,9 +1955,6 @@ const handleIconClick = async (
 
 log('Content script loaded and ready')
 
-// Initialize inline AI icons for input fields
-initializeInlineAIIcons()
-
 // Jira-specific field detection and handling
 const isJiraField = (input: HTMLInputElement | HTMLTextAreaElement): boolean => {
   // Check if we're on Jira
@@ -2129,3 +2126,6 @@ const setupJiraEventListeners = (
     if (!isEditing) hideIcon()
   })
 }
+
+// Initialize inline AI icons for input fields
+initializeInlineAIIcons()

@@ -60,8 +60,17 @@ const AutoDetectionSection: React.FC<AutoDetectionSectionProps> = ({
         </Typography>
       </Box>
 
-      {/* Main Content */}
-      <Paper sx={{ p: 4, mb: 3 }}>
+      {/* Main Content Card */}
+      <Box
+        sx={{
+          p: 4,
+          mb: 3,
+          border: '1px solid #e0e0e0',
+          borderRadius: 2,
+          backgroundColor: '#f8f9fa',
+          transition: 'all 0.2s ease',
+        }}
+      >
         <Typography variant="h6" sx={{ fontWeight: 600, mb: 3 }}>
           Text Selection Detection
         </Typography>
@@ -123,7 +132,7 @@ const AutoDetectionSection: React.FC<AutoDetectionSectionProps> = ({
             />
           </RadioGroup>
         </FormControl>
-      </Paper>
+      </Box>
 
       {/* Information Alert */}
       <Alert severity="info" sx={{ mb: 3 }}>
